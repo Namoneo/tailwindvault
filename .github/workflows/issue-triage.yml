@@ -1,0 +1,23 @@
+name: Issue Triage
+
+on:
+  issues:
+    types: [opened, edited, reopened]
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Issue triage
+        run: |
+          echo "=== Issue Triage ==="
+          echo "Action: ${{ github.event.action }}"
+          echo "Issue: ${{ github.event.issue.number }}"
+          echo "Title: ${{ github.event.issue.title }}"
+          echo "Labels: ${{ join(github.event.issue.labels.*.name, ', ') }}"
+          echo ""
+          echo "=== Next steps ==="
+          echo "1. Check for duplicates"
+          echo "2. Suggest labels if missing"
+          echo "3. Route to appropriate agent"
+          echo "4. Notify Telegram topic if configured"

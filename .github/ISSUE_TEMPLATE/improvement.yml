@@ -1,0 +1,32 @@
+name: Improvement
+description: Improve an existing part of the system
+labels: [improvement]
+body:
+  - type: textarea
+    id: area
+    attributes:
+      label: Area to improve
+      description: What specific part needs improvement?
+    validations:
+      required: true
+  - type: textarea
+    id: value
+    attributes:
+      label: Why this matters
+      description: What value does this bring?
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: How will we know this is done?
+    validations:
+      required: true
+  - type: textarea
+    id: current
+    attributes:
+      label: Current state
+      description: How does it work now?
+    validations:
+      required: false
