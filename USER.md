@@ -1,17 +1,13 @@
 # USER.md - About Your Human
 
-_Learn about the person you're helping. Update this as you go._
-
-- **Name:**
-- **What to call them:**
-- **Pronouns:** _(optional)_
-- **Timezone:**
-- **Notes:**
+- **Name:** Sh.S
+- **What to call them:** Sh.S
+- **Pronouns:** _(unknown)_
+- **Timezone:** Europe/Amsterdam
 
 ## Context
 
-_(What do they care about? What projects are they working on? What annoys them? What makes them laugh? Build this over time.)_
-
----
-
-The more you know, the better you can help. But remember — you're learning about a person, not building a dossier. Respect the difference.
+- Set up the tailwindvault OpenClaw workspace — Telegram-based control room for repo automation
+- Running macOS, node v24, zsh shell
+- Prefers things done well over things done fast — but appreciates when both happen
+- Comfortable with CLI tooling, GitHub workflows, and automation scripts
