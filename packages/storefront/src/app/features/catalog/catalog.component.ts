@@ -6,6 +6,7 @@ import { ApiService, Product } from '../../core/services/api.service';
 
 type DemoProduct = Product & {
   mood: string;
+  categoryId: string;
   framework: string[];
   accent: string;
 };
@@ -176,20 +177,22 @@ export class CatalogComponent implements OnInit {
   ];
 
   private readonly demoProducts: DemoProduct[] = [
-    { id: 'demo-1', slug: 'hero-sections', name: 'Hero Sections', description: 'Bold landing page intros, editorial split-heroes, and conversion-first callouts.', price: 59, teamPrice: 149, mood: 'Cinematic', framework: ['Angular', 'React', 'Vue'], accent: 'linear-gradient(135deg, #102a43 0%, #1f4f78 100%)' },
-    { id: 'demo-2', slug: 'dashboard-chrome', name: 'Dashboard Chrome', description: 'Metric bands, dense data cards, and polished account surfaces for SaaS products.', price: 79, teamPrice: 189, mood: 'Operational', framework: ['Angular', 'React'], accent: 'linear-gradient(135deg, #16324f 0%, #4c7b8c 100%)' },
-    { id: 'demo-3', slug: 'checkout-flow', name: 'Checkout Flow', description: 'Payment, cart, receipt, and upsell modules tuned for digital products.', price: 69, teamPrice: 169, mood: 'Commerce', framework: ['Angular', 'Vue'], accent: 'linear-gradient(135deg, #7c2d12 0%, #f26b38 100%)' },
-    { id: 'demo-4', slug: 'pricing-stories', name: 'Pricing Stories', description: 'Editorial pricing tables with social proof, FAQs, and upgrade states.', price: 49, teamPrice: 129, mood: 'Conversion', framework: ['React', 'Vue'], accent: 'linear-gradient(135deg, #3f3cbb 0%, #6a60ff 100%)' },
-    { id: 'demo-5', slug: 'admin-panels', name: 'Admin Panels', description: 'Operational tooling with filters, moderation patterns, and audit-ready layouts.', price: 89, teamPrice: 219, mood: 'Control', framework: ['Angular', 'React'], accent: 'linear-gradient(135deg, #203a43 0%, #2c5364 100%)' },
-    { id: 'demo-6', slug: 'account-settings', name: 'Account Settings', description: 'Profile, billing, and license management screens with a premium tone.', price: 39, teamPrice: 109, mood: 'Utility', framework: ['Angular', 'React', 'Vue'], accent: 'linear-gradient(135deg, #3b1f2b 0%, #a445b2 100%)' },
+    { id: 'demo-1', slug: 'hero-sections', name: 'Hero Sections', description: 'Bold landing page intros, editorial split-heroes, and conversion-first callouts.', price: 59, teamPrice: 149, mood: 'Cinematic', categoryId: 'heroes', framework: ['Angular', 'React', 'Vue'], accent: 'linear-gradient(135deg, #102a43 0%, #1f4f78 100%)' },
+    { id: 'demo-2', slug: 'dashboard-chrome', name: 'Dashboard Chrome', description: 'Metric bands, dense data cards, and polished account surfaces for SaaS products.', price: 79, teamPrice: 189, mood: 'Operational', categoryId: 'dashboard', framework: ['Angular', 'React'], accent: 'linear-gradient(135deg, #16324f 0%, #4c7b8c 100%)' },
+    { id: 'demo-3', slug: 'checkout-flow', name: 'Checkout Flow', description: 'Payment, cart, receipt, and upsell modules tuned for digital products.', price: 69, teamPrice: 169, mood: 'Commerce', categoryId: 'commerce', framework: ['Angular', 'Vue'], accent: 'linear-gradient(135deg, #7c2d12 0%, #f26b38 100%)' },
+    { id: 'demo-4', slug: 'pricing-stories', name: 'Pricing Stories', description: 'Editorial pricing tables with social proof, FAQs, and upgrade states.', price: 49, teamPrice: 129, mood: 'Conversion', categoryId: 'commerce', framework: ['React', 'Vue'], accent: 'linear-gradient(135deg, #3f3cbb 0%, #6a60ff 100%)' },
+    { id: 'demo-5', slug: 'admin-panels', name: 'Admin Panels', description: 'Operational tooling with filters, moderation patterns, and audit-ready layouts.', price: 89, teamPrice: 219, mood: 'Control', categoryId: 'dashboard', framework: ['Angular', 'React'], accent: 'linear-gradient(135deg, #203a43 0%, #2c5364 100%)' },
+    { id: 'demo-6', slug: 'account-settings', name: 'Account Settings', description: 'Profile, billing, and license management screens with a premium tone.', price: 39, teamPrice: 109, mood: 'Utility', categoryId: 'dashboard', framework: ['Angular', 'React', 'Vue'], accent: 'linear-gradient(135deg, #3b1f2b 0%, #a445b2 100%)' },
   ];
 
   protected readonly visibleProducts = computed(() => {
     const source = this.usingFallback() ? this.demoProducts : this.products().map((product) => this.decorateProduct(product));
     const query = this.searchQuery.trim().toLowerCase();
+    const cat = this.activeCategory();
     return source.filter((product) => {
       const matchesQuery = !query || `${product.name} ${product.description ?? ''}`.toLowerCase().includes(query);
-      return matchesQuery;
+      const matchesCat = !cat || (product as any).categoryId === cat;
+      return matchesQuery && matchesCat;
     });
   });
 
