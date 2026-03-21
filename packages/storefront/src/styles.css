@@ -1,0 +1,117 @@
+@import "tailwindcss";
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  background:
+    radial-gradient(circle at top left, rgba(242, 107, 56, 0.12), transparent 30%),
+    radial-gradient(circle at bottom right, rgba(11, 30, 48, 0.08), transparent 28%),
+    linear-gradient(180deg, #fffdf9 0%, #f4efe5 100%);
+  color: #0f172a;
+}
+
+.app-shell {
+  min-height: 100vh;
+  color: #0f172a;
+}
+
+.hero-atmosphere {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 15% 20%, rgba(242, 107, 56, 0.22), transparent 24%),
+    radial-gradient(circle at 80% 5%, rgba(16, 42, 67, 0.2), transparent 26%),
+    linear-gradient(180deg, #fff7eb 0%, transparent 100%);
+}
+
+.section-shell {
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: 0 25px 70px -40px rgba(16, 42, 67, 0.4);
+}
+
+.section-shell-dark {
+  background: #102a43;
+  color: white;
+  box-shadow: 0 25px 70px -35px rgba(16, 42, 67, 0.85);
+}
+
+.warm-panel {
+  background: #f8f3e8;
+}
+
+.soft-panel {
+  background: #fffdf9;
+}
+
+.eyebrow {
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+}
+
+.editorial-title {
+  font-family: Georgia, Cambria, "Times New Roman", Times, serif;
+  letter-spacing: -0.03em;
+}
+
+.route-chip {
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.soft-card {
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  background: #fffdf9;
+}
+
+.metric-card {
+  background: #f8f3e8;
+}
+
+.input-shell {
+  border: 1px solid rgba(226, 232, 240, 1);
+  background: #fffdf9;
+}
+
+.input-shell:focus {
+  outline: none;
+  border-color: #f26b38;
+}
+
+.secondary-button {
+  border: 1px solid rgba(203, 213, 225, 1);
+  background: white;
+  color: #1e293b;
+}
+
+.secondary-button:hover {
+  border-color: #102a43;
+}
+
+.brand-button {
+  background: #102a43;
+  color: white;
+}
+
+.brand-button:hover {
+  background: #0b2236;
+}
+
+.accent-button {
+  background: #f26b38;
+  color: white;
+}
+
+.accent-button:hover {
+  background: #d85c2e;
+}
