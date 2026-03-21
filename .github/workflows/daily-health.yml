@@ -1,0 +1,64 @@
+name: Daily Health
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 7 * * *'
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Repo info
+        run: |
+          echo "Repository: ${{ github.repository }}"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Last commit: $(git log -1 --oneline)"
+
+      - name: Check open issues
+        run: |
+          open=$(gh issue list --state open --limit 10 --json number,title,labels --jq '.[] | "\(.number) \(.title)"' 2>/dev/null || echo "gh not available")
+          echo "Open issues:"
+          echo "$open"
+
+      - name: Check stale issues
+        run: |
+          if command -v gh &>/dev/null; then
+            stale=$(gh issue list --state open --search "updated:<2026-02-21" --limit 5 --json number,title --jq '.[] | "\(.number) \(.title)"' 2>/dev/null || echo "")
+            if [ -n "$stale" ]; then
+              echo "⚠️ Stale issues (no activity >30d):"
+              echo "$stale"
+            else
+              echo "✅ No stale issues"
+            fi
+          fi
+
+      - name: Check open PRs
+        run: |
+          prs=$(gh pr list --state open --limit 5 --json number,title,reviewState --jq '.[] | "\(.number) \(.title) [\(.[\"reviewState\"] // \"pending\")]"' 2>/dev/null || echo "gh not available")
+          echo "Open PRs:"
+          echo "$prs"
+
+      - name: Check CI status
+        run: |
+          if command -v gh &>/dev/null; then
+            runs=$(gh run list --limit 3 --json name,status,conclusion --jq '.[] | "\(.name): \(.status // .conclusion)"' 2>/dev/null || echo "gh not available")
+            echo "Recent CI runs:"
+            echo "$runs"
+          fi
+
+      - name: Source structure
+        run: |
+          echo "=== Source folders ==="
+          find . -maxdepth 3 -type d \( -name "src" -o -name "lib" -o -name "app" -o -name "packages" \) 2>/dev/null | head -10 || true
+          echo "=== Config files ==="
+          ls *.json *.yaml *.yml 2>/dev/null || echo "None in root"
+
+      - name: Package manifests
+        run: |
+          for f in $(find . -maxdepth 2 \( -name "package.json" -o -name "pyproject.toml" -o -name "go.mod" -o -name "Cargo.toml" \) 2>/dev/null); do
+            echo "--- $f ---"
+            head -5 "$f"
+          done
