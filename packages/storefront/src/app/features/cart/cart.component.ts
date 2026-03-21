@@ -50,7 +50,7 @@ import { CartService } from '../../core/services/cart.service';
                   <div>
                     <div class="text-xs uppercase tracking-[0.24em] text-slate-400">Quantity</div>
                     <div class="mt-3 flex items-center gap-2">
-                      <button (click)="cart.updateQuantity(item.productId, item.quantity - 1)" class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700">-</button>
+                      <button (click)="decrementQuantity(item)" class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700">-</button>
                       <span class="inline-flex min-w-12 items-center justify-center rounded-full bg-slate-100 px-4 py-2 font-semibold text-slate-900">{{ item.quantity }}</span>
                       <button (click)="cart.updateQuantity(item.productId, item.quantity + 1)" class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700">+</button>
                     </div>
@@ -108,6 +108,14 @@ import { CartService } from '../../core/services/cart.service';
 })
 export class CartComponent {
   cart = inject(CartService);
+
+  decrementQuantity(item: { productId: string; quantity: number }) {
+    if (item.quantity <= 1) {
+      this.cart.remove(item.productId);
+    } else {
+      this.cart.updateQuantity(item.productId, item.quantity - 1);
+    }
+  }
 
   protected readonly sellingPoints = [
     { title: 'Instant delivery', description: 'Framework files and Tailwind-ready markup are available as soon as the order completes.' },

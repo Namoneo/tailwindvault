@@ -58,53 +58,68 @@ import { CartService } from '../../core/services/cart.service';
           </aside>
 
           <div class="section-shell rounded-[2rem] p-8">
-            <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-              <div>
-                <div class="text-xs uppercase tracking-[0.24em] text-[#f26b38]">Payment</div>
-                <h2 class="mt-3 text-3xl font-semibold text-slate-950">Secure checkout</h2>
-              </div>
-              <div class="rounded-full bg-[#f8f3e8] px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-slate-600">Test mode</div>
-            </div>
-
-            <form class="mt-8 space-y-5" (ngSubmit)="processPayment()">
-              <div>
-                <label class="text-xs uppercase tracking-[0.22em] text-slate-500">Email</label>
-                <input type="email" [(ngModel)]="email" name="email" class="input-shell mt-2 w-full rounded-2xl px-4 py-4 text-slate-900 transition" />
-              </div>
-
-              <div>
-                <label class="text-xs uppercase tracking-[0.22em] text-slate-500">Card number</label>
-                <input type="text" [(ngModel)]="cardNumber" name="cardNumber" placeholder="4242 4242 4242 4242" class="input-shell mt-2 w-full rounded-2xl px-4 py-4 text-slate-900 transition" />
-              </div>
-
-              <div class="grid gap-5 md:grid-cols-2">
-                <div>
-                  <label class="text-xs uppercase tracking-[0.22em] text-slate-500">Expiry</label>
-                  <input type="text" [(ngModel)]="expiry" name="expiry" placeholder="MM/YY" class="input-shell mt-2 w-full rounded-2xl px-4 py-4 text-slate-900 transition" />
+            @if (success()) {
+              <div class="flex flex-col items-center justify-center py-12 text-center">
+                <div class="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-[#22c55e]/20">
+                  <svg class="h-10 w-10 text-[#22c55e]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
                 </div>
+                <h2 class="text-3xl font-semibold text-slate-950">Order confirmed!</h2>
+                <p class="mt-4 text-slate-600">Your files are ready. Check your email for access details.</p>
+                <a routerLink="/dashboard" class="mt-8 rounded-full bg-[#102a43] px-8 py-4 text-sm font-semibold text-white transition hover:bg-[#1a3a5c]">Go to dashboard</a>
+              </div>
+            } @else {
+              <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div>
-                  <label class="text-xs uppercase tracking-[0.22em] text-slate-500">CVC</label>
-                  <input type="text" [(ngModel)]="cvc" name="cvc" placeholder="123" class="input-shell mt-2 w-full rounded-2xl px-4 py-4 text-slate-900 transition" />
+                  <div class="text-xs uppercase tracking-[0.24em] text-[#f26b38]">Payment</div>
+                  <h2 class="mt-3 text-3xl font-semibold text-slate-950">Secure checkout</h2>
                 </div>
+                <div class="rounded-full bg-[#f8f3e8] px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-slate-600">Test mode</div>
               </div>
 
-              <div class="rounded-[1.5rem] bg-[#f8f3e8] p-5 text-sm leading-6 text-slate-700">
-                <div class="font-semibold text-slate-950">Included with every order</div>
-                <ul class="mt-3 space-y-2">
-                  @for (item of assurances; track item) {
-                    <li>{{ item }}</li>
+              @if (errorMessage()) {
+                <div class="mt-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">{{ errorMessage() }}</div>
+              }
+
+              <form class="mt-8 space-y-5" (ngSubmit)="processPayment()">
+                <div>
+                  <label class="text-xs uppercase tracking-[0.22em] text-slate-500">Email</label>
+                  <input type="email" [(ngModel)]="email" name="email" class="input-shell mt-2 w-full rounded-2xl px-4 py-4 text-slate-900 transition" />
+                </div>
+
+                <div>
+                  <label class="text-xs uppercase tracking-[0.22em] text-slate-500">Card number</label>
+                  <input type="text" [(ngModel)]="cardNumber" name="cardNumber" placeholder="4242 4242 4242 4242" class="input-shell mt-2 w-full rounded-2xl px-4 py-4 text-slate-900 transition" />
+                </div>
+
+                <div class="grid gap-5 md:grid-cols-2">
+                  <div>
+                    <label class="text-xs uppercase tracking-[0.22em] text-slate-500">Expiry</label>
+                    <input type="text" [(ngModel)]="expiry" name="expiry" placeholder="MM/YY" class="input-shell mt-2 w-full rounded-2xl px-4 py-4 text-slate-900 transition" />
+                  </div>
+                  <div>
+                    <label class="text-xs uppercase tracking-[0.22em] text-slate-500">CVC</label>
+                    <input type="text" [(ngModel)]="cvc" name="cvc" placeholder="123" class="input-shell mt-2 w-full rounded-2xl px-4 py-4 text-slate-900 transition" />
+                  </div>
+                </div>
+
+                <div class="rounded-[1.5rem] bg-[#f8f3e8] p-5 text-sm leading-6 text-slate-700">
+                  <div class="font-semibold text-slate-950">Included with every order</div>
+                  <ul class="mt-3 space-y-2">
+                    @for (item of assurances; track item) {
+                      <li>{{ item }}</li>
+                    }
+                  </ul>
+                </div>
+
+                <button type="submit" [disabled]="processing()" class="brand-button w-full rounded-full px-6 py-4 text-sm font-semibold transition disabled:opacity-50">
+                  @if (processing()) {
+                    Processing order...
+                  } @else {
+                    Pay \${{ cart.total() }}
                   }
-                </ul>
-              </div>
-
-              <button type="submit" [disabled]="processing()" class="brand-button w-full rounded-full px-6 py-4 text-sm font-semibold transition disabled:opacity-50">
-                @if (processing()) {
-                  Processing order...
-                } @else {
-                  Pay \${{ cart.total() }}
-                }
-              </button>
-            </form>
+                </button>
+              </form>
+            }
           </div>
         </div>
       }
@@ -119,6 +134,8 @@ export class CheckoutComponent {
   expiry = '';
   cvc = '';
   processing = signal(false);
+  success = signal(false);
+  errorMessage = signal('');
 
   protected readonly assurances = [
     'Instant access to downloaded files after purchase',
@@ -126,12 +143,35 @@ export class CheckoutComponent {
     'Team upgrades available later without losing the original order',
   ];
 
-  processPayment() {
+  processPayment(): boolean {
+    this.errorMessage.set('');
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const cardDigits = this.cardNumber.replace(/\D/g, '');
+    const expiryMatch = this.expiry.match(/^(\d{2})\/(\d{2})$/);
+
+    if (!emailRegex.test(this.email)) {
+      this.errorMessage.set('Please enter a valid email address.');
+      return false;
+    }
+    if (cardDigits.length < 13 || cardDigits.length > 19) {
+      this.errorMessage.set('Please enter a valid card number.');
+      return false;
+    }
+    if (!expiryMatch || parseInt(expiryMatch[1], 10) < 1 || parseInt(expiryMatch[1], 10) > 12) {
+      this.errorMessage.set('Please enter a valid expiry date (MM/YY).');
+      return false;
+    }
+    if (this.cvc.replace(/\D/g, '').length < 3 || this.cvc.replace(/\D/g, '').length > 4) {
+      this.errorMessage.set('Please enter a valid CVC.');
+      return false;
+    }
+
     this.processing.set(true);
     setTimeout(() => {
       this.cart.clear();
       this.processing.set(false);
-      alert('Payment successful!');
+      this.success.set(true);
     }, 2000);
+    return true;
   }
 }
