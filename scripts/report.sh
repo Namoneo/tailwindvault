@@ -78,10 +78,15 @@ fi
 cat "$report_file"
 
 if [[ "$SEND_TELEGRAM" == true ]] && [[ -n "${TELEGRAM_BOT_TOKEN:-}" ]] && [[ -n "${TELEGRAM_CHAT_ID:-}" ]]; then
-  curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+  # Truncate message to Telegram's 4096 character limit
+  telegram_message="$(cat "$report_file")"
+  if [[ ${#telegram_message} -gt 4096 ]]; then
+    telegram_message="${telegram_message:0:4093}..."
+  fi
+  printf '%s' "$telegram_message" | curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
     -d "chat_id=${TELEGRAM_CHAT_ID}" \
     -d "message_thread_id=${TELEGRAM_TOPIC_ID:-21}" \
-    --data-urlencode "text@$report_file" >/dev/null || true
+    --data-urlencode text=- >/dev/null || true
 fi
 
 rm -f "$report_file"
