@@ -33,7 +33,7 @@ run_rg() {
   if command -v rg >/dev/null 2>&1; then
     rg "$@" || true
   else
-    grep -E -R "$@" . 2>/dev/null || true
+    grep -E -R "$@" 2>/dev/null || true
   fi
 }
 
