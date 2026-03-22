@@ -2,6 +2,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { CartService } from './core/services/cart.service';
+import { AuthService } from './core/services/auth.service';
 
 @Component({
   selector: 'app-root',
@@ -20,7 +21,7 @@ import { CartService } from './core/services/cart.service';
           </a>
 
           <div class="hidden items-center gap-2 lg:flex">
-            @for (link of primaryLinks; track link.path) {
+            @for (link of primaryLinks(); track link.path) {
               <a
                 [routerLink]="link.path"
                 routerLinkActive="bg-[#102a43] text-white shadow-lg shadow-slate-900/10"
@@ -42,9 +43,19 @@ import { CartService } from './core/services/cart.service';
               }
             </a>
 
-            <a routerLink="/auth" class="hidden rounded-full bg-[#102a43] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#0b2236] sm:inline-flex">
-              {{ isAuthenticated() ? 'Profile' : 'Sign In' }}
-            </a>
+            @if (isAuthenticated()) {
+              <button
+                type="button"
+                (click)="logout()"
+                class="hidden rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-red-300 hover:text-red-600 sm:inline-flex"
+              >
+                Sign Out
+              </button>
+            } @else {
+              <a routerLink="/auth" class="hidden rounded-full bg-[#102a43] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#0b2236] sm:inline-flex">
+                Sign In
+              </a>
+            }
 
             <button
               type="button"
@@ -62,7 +73,7 @@ import { CartService } from './core/services/cart.service';
         @if (menuOpen()) {
           <div class="border-t border-slate-200/80 bg-white/95 px-4 py-4 lg:hidden">
             <div class="mx-auto flex max-w-7xl flex-col gap-2">
-              @for (link of allLinks; track link.path) {
+              @for (link of allLinks(); track link.path) {
                 <a
                   [routerLink]="link.path"
                   (click)="menuOpen.set(false)"
@@ -77,7 +88,7 @@ import { CartService } from './core/services/cart.service';
 
         <div class="border-t border-white/60 bg-white/60">
           <div class="mx-auto flex max-w-7xl gap-2 overflow-x-auto px-4 py-3 text-xs sm:px-6 lg:px-8">
-            @for (link of allLinks; track link.path) {
+            @for (link of allLinks(); track link.path) {
               <a
                 [routerLink]="link.path"
                 class="route-chip whitespace-nowrap rounded-full px-3 py-1.5 font-medium uppercase tracking-[0.2em] text-slate-500 transition hover:border-[#f26b38] hover:text-[#102a43]"
@@ -103,7 +114,7 @@ import { CartService } from './core/services/cart.service';
             </p>
           </div>
           <div class="grid grid-cols-2 gap-3 text-sm text-slate-300">
-            @for (link of allLinks; track link.path) {
+            @for (link of allLinks(); track link.path) {
               <a [routerLink]="link.path" class="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 transition hover:border-[#f7c66f]/50 hover:bg-white/10 hover:text-white">
                 {{ link.label }}
               </a>
@@ -116,23 +127,53 @@ import { CartService } from './core/services/cart.service';
 })
 export class AppComponent {
   private cart = inject(CartService);
-  protected readonly primaryLinks = [
-    { path: '/', label: 'Home', exact: true },
-    { path: '/catalog', label: 'Catalog' },
-    { path: '/dashboard', label: 'Dashboard' },
-    { path: '/admin', label: 'Admin' },
-  ];
-  protected readonly allLinks = [
-    { path: '/', label: 'Home' },
-    { path: '/catalog', label: 'Catalog' },
-    { path: '/product/hero-sections', label: 'Product' },
-    { path: '/cart', label: 'Cart' },
-    { path: '/checkout', label: 'Checkout' },
-    { path: '/auth', label: 'Auth' },
-    { path: '/dashboard', label: 'Dashboard' },
-    { path: '/admin', label: 'Admin' },
-  ];
+  private auth = inject(AuthService);
+  protected readonly primaryLinks = computed(() => {
+    const links = [
+      { path: '/', label: 'Home', exact: true },
+      { path: '/catalog', label: 'Catalog', exact: false }
+    ];
+
+    if (this.isAuthenticated()) {
+      links.push({ path: '/dashboard', label: 'Dashboard', exact: false });
+    }
+
+    if (this.isAdmin()) {
+      links.push({ path: '/admin', label: 'Admin', exact: false });
+    }
+
+    return links;
+  });
+
+  protected readonly allLinks = computed(() => {
+    const links = [
+      { path: '/', label: 'Home' },
+      { path: '/catalog', label: 'Catalog' },
+      { path: '/product/ecommerce-navbar-pro', label: 'Product' },
+      { path: '/cart', label: 'Cart' },
+      { path: '/checkout', label: 'Checkout' }
+    ];
+
+    if (!this.isAuthenticated()) {
+      links.push({ path: '/auth', label: 'Auth' });
+    }
+
+    if (this.isAuthenticated()) {
+      links.push({ path: '/dashboard', label: 'Dashboard' });
+    }
+
+    if (this.isAdmin()) {
+      links.push({ path: '/admin', label: 'Admin' });
+    }
+
+    return links;
+  });
   menuOpen = signal(false);
   cartCount = computed(() => this.cart.count());
-  isAuthenticated = signal(false);
+  isAuthenticated = computed(() => this.auth.isAuthenticated());
+  isAdmin = computed(() => this.auth.isAdmin());
+
+  logout(): void {
+    this.auth.logout();
+  }
 }

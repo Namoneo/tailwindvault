@@ -2,22 +2,91 @@ name: Issue Triage
 
 on:
   issues:
-    types: [opened, edited, reopened]
+    types: [opened]
+
+permissions:
+  contents: read
+  issues: write
 
 jobs:
   triage:
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      ISSUE_NUMBER: ${{ github.event.issue.number }}
+      DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
     steps:
-      - name: Issue triage
+      - name: Ensure repository labels exist
         run: |
-          echo "=== Issue Triage ==="
-          echo "Action: ${{ github.event.action }}"
-          echo "Issue: ${{ github.event.issue.number }}"
-          echo "Title: ${{ github.event.issue.title }}"
-          echo "Labels: ${{ join(github.event.issue.labels.*.name, ', ') }}"
-          echo ""
-          echo "=== Next steps ==="
-          echo "1. Check for duplicates"
-          echo "2. Suggest labels if missing"
-          echo "3. Route to appropriate agent"
-          echo "4. Notify Telegram topic if configured"
+          gh label create "bug" --repo "$REPO" --color "d73a4a" --description "A reproducible defect in the product." --force
+          gh label create "feature" --repo "$REPO" --color "0e8a16" --description "A net-new product capability or workflow." --force
+          gh label create "improvement" --repo "$REPO" --color "a2eeef" --description "A refactor, optimization, or polish request." --force
+          gh label create "storefront" --repo "$REPO" --color "1d76db" --description "Angular storefront scope." --force
+          gh label create "api" --repo "$REPO" --color "5319e7" --description "NestJS API or database scope." --force
+          gh label create "docs" --repo "$REPO" --color "0075ca" --description "README, contributing, or workflow documentation scope." --force
+          gh label create "needs-repro" --repo "$REPO" --color "fbca04" --description "More reproduction detail is required." --force
+          gh label create "needs-triage" --repo "$REPO" --color "c2e0c6" --description "Initial automated triage completed." --force
+
+      - name: Suggest and apply labels
+        id: suggest
+        run: |
+          issue_text="$(gh issue view "$ISSUE_NUMBER" --repo "$REPO" --json title,body --jq '.title + "\n" + (.body // "")' | tr '[:upper:]' '[:lower:]')"
+          declare -a labels=("needs-triage")
+          needs_repro=false
+
+          if grep -Eq 'bug|error|fail|broken|regression|crash' <<<"$issue_text"; then
+            labels+=("bug")
+          fi
+
+          if grep -Eq 'feature|request|add|support|new capability|new feature' <<<"$issue_text"; then
+            labels+=("feature")
+          fi
+
+          if grep -Eq 'improve|improvement|refactor|performance|optimi[sz]e|cleanup' <<<"$issue_text"; then
+            labels+=("improvement")
+          fi
+
+          if grep -Eq 'storefront|angular|frontend|landing|catalog|checkout|dashboard|ui' <<<"$issue_text"; then
+            labels+=("storefront")
+          fi
+
+          if grep -Eq 'api|nest|backend|endpoint|prisma|database|webhook|license|download|auth' <<<"$issue_text"; then
+            labels+=("api")
+          fi
+
+          if grep -Eq 'readme|docs|documentation|workflow|template|contributing' <<<"$issue_text"; then
+            labels+=("docs")
+          fi
+
+          if grep -Eq 'bug|error|fail|broken|regression|crash' <<<"$issue_text" && ! grep -Eq 'steps to reproduce|expected|actual|1\.|2\.|3\.' <<<"$issue_text"; then
+            labels+=("needs-repro")
+            needs_repro=true
+          fi
+
+          unique_labels="$(printf '%s\n' "${labels[@]}" | awk 'NF && !seen[$0]++')"
+          while IFS= read -r label; do
+            gh issue edit "$ISSUE_NUMBER" --repo "$REPO" --add-label "$label"
+          done <<<"$unique_labels"
+
+          suggestions="$(printf '%s\n' "$unique_labels" | awk 'BEGIN { first = 1 } { if (!first) printf ", "; printf "%s", $0; first = 0 } END { print "" }')"
+          {
+            printf 'labels=%s\n' "$suggestions"
+            printf 'needs_repro=%s\n' "$needs_repro"
+          } >>"$GITHUB_OUTPUT"
+
+      - name: Post triage comment
+        run: |
+          comment_file="$(mktemp)"
+          {
+            printf 'Automated triage has started.\n\n'
+            printf -- '- Suggested labels: `%s`\n' "${{ steps.suggest.outputs.labels }}"
+            printf -- '- Contributing guide: %s/%s/blob/%s/CONTRIBUTING.md\n' "${GITHUB_SERVER_URL}" "${REPO}" "${DEFAULT_BRANCH}"
+            printf -- '- Next step: confirm the affected area and attach screenshots or payload samples if they help reproduce the issue.\n'
+
+            if [[ "${{ steps.suggest.outputs.needs_repro }}" == "true" ]]; then
+              printf '\nThis issue looks like a bug report but the reproduction detail is still thin. Please add exact steps, expected behavior, and actual behavior.\n'
+            fi
+          } >"$comment_file"
+
+          gh issue comment "$ISSUE_NUMBER" --repo "$REPO" --body-file "$comment_file"

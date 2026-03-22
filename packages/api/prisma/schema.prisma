@@ -1,0 +1,84 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           Int       @id @default(autoincrement())
+  name         String
+  email        String    @unique
+  passwordHash String
+  role         String    @default("customer")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  orders       Order[]
+  licenses     License[]
+}
+
+model Product {
+  id              Int         @id @default(autoincrement())
+  slug            String      @unique
+  name            String
+  description     String
+  category        String
+  price           Int
+  teamPrice       Int
+  previewImageUrl String
+  downloadUrl     String
+  featuresJson    String      @default("[]")
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  orderItems      OrderItem[]
+  licenses        License[]
+}
+
+model Order {
+  id              Int         @id @default(autoincrement())
+  email           String
+  userId          Int?
+  status          String      @default("pending")
+  subtotal        Int
+  total           Int
+  checkoutUrl     String?
+  stripeSessionId String?
+  paidAt          DateTime?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  user            User?       @relation(fields: [userId], references: [id])
+  items           OrderItem[]
+  licenses        License[]
+}
+
+model OrderItem {
+  id          Int      @id @default(autoincrement())
+  orderId     Int
+  productId   Int
+  productName String
+  productSlug String
+  quantity    Int      @default(1)
+  unitPrice   Int
+  licenseType String   @default("single")
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product     Product  @relation(fields: [productId], references: [id])
+}
+
+model License {
+  id            Int       @id @default(autoincrement())
+  code          String    @unique
+  status        String    @default("active")
+  email         String
+  userId        Int?
+  orderId       Int
+  productId     Int
+  downloadCount Int       @default(0)
+  expiresAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  user          User?     @relation(fields: [userId], references: [id])
+  order         Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product       Product   @relation(fields: [productId], references: [id])
+}
