@@ -1,0 +1,8 @@
+name = "tailwindvault"
+compatibility_date = "2024-01-01"
+
+# This is a static site (Angular SPA) deployed to Cloudflare Workers
+# The build output is served as static assets
+
+[site]
+bucket = "./packages/storefront/dist/storefront/browser"
