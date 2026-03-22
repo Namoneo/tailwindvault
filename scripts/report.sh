@@ -86,7 +86,7 @@ if [[ "$SEND_TELEGRAM" == true ]] && [[ -n "${TELEGRAM_BOT_TOKEN:-}" ]] && [[ -n
   printf '%s' "$telegram_message" | curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
     -d "chat_id=${TELEGRAM_CHAT_ID}" \
     -d "message_thread_id=${TELEGRAM_TOPIC_ID:-21}" \
-    --data-urlencode text=- >/dev/null || true
+    --data-urlencode "text@-" >/dev/null || true
 fi
 
 rm -f "$report_file"
