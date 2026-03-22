@@ -30,8 +30,15 @@ export class WebhooksController {
     @Headers('stripe-webhook-secret') webhookSecret: string,
   ) {
     const expectedSecret = this.configService.get<string>('STRIPE_WEBHOOK_SECRET');
-    if (expectedSecret && webhookSecret !== expectedSecret) {
-      throw new UnauthorizedException('Invalid webhook secret');
+
+    // Fail-closed: if secret is configured, signature must match
+    if (expectedSecret) {
+      if (!webhookSecret || webhookSecret !== expectedSecret) {
+        throw new UnauthorizedException('Invalid webhook secret');
+      }
+    } else {
+      // No secret configured — reject to fail closed
+      throw new UnauthorizedException('Webhook secret not configured');
     }
 
     if (payload.type !== 'checkout.session.completed') {

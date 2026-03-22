@@ -1,8 +1,14 @@
-import { Controller, Get, Param, ParseIntPipe, Res, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, ParseIntPipe, Req, Res, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { DownloadsService } from './downloads.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+
+type RequestUser = {
+  userId: number;
+  email: string;
+  role: string;
+};
 
 @ApiBearerAuth()
 @ApiTags('downloads')
@@ -15,9 +21,11 @@ export class DownloadsController {
   async download(
     @Param('licenseId', ParseIntPipe) licenseId: number,
     @Param('productSlug') productSlug: string,
-    @Res() response: Response
+    @Req() req: Request,
+    @Res() res: Response
   ) {
-    const downloadUrl = await this.downloadsService.resolveDownload(licenseId, productSlug);
-    return response.redirect(downloadUrl);
+    const user = req.user as RequestUser;
+    const downloadUrl = await this.downloadsService.resolveDownload(licenseId, productSlug, user);
+    return res.redirect(downloadUrl);
   }
 }

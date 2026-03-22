@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 import { Repository, In } from 'typeorm';
+import { randomBytes } from 'crypto';
 import { LicenseEntity } from '../licenses/license.entity';
 import { ProductEntity } from '../products/product.entity';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -190,7 +191,7 @@ export class OrdersService {
   }
 
   private generateLicenseCode(orderId: number, productId: number, offset: number) {
-    const uniqueChunk = Math.random().toString(36).slice(2, 8).toUpperCase();
+    const uniqueChunk = randomBytes(4).toString('hex').slice(0, 6).toUpperCase();
     return `TV-${orderId}-${productId}-${offset + 1}-${uniqueChunk}`;
   }
 }
