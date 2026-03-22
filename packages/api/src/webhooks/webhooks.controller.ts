@@ -1,5 +1,6 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Post, Headers, UnauthorizedException } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { ConfigService } from '@nestjs/config';
 import { OrdersService } from '../orders/orders.service';
 
 type StripeEventPayload = {
@@ -18,10 +19,21 @@ type StripeEventPayload = {
 @ApiTags('webhooks')
 @Controller('webhooks')
 export class WebhooksController {
-  constructor(private readonly ordersService: OrdersService) {}
+  constructor(
+    private readonly ordersService: OrdersService,
+    private readonly configService: ConfigService,
+  ) {}
 
   @Post('stripe')
-  async handleStripeWebhook(@Body() payload: StripeEventPayload) {
+  async handleStripeWebhook(
+    @Body() payload: StripeEventPayload,
+    @Headers('stripe-webhook-secret') webhookSecret: string,
+  ) {
+    const expectedSecret = this.configService.get<string>('STRIPE_WEBHOOK_SECRET');
+    if (expectedSecret && webhookSecret !== expectedSecret) {
+      throw new UnauthorizedException('Invalid webhook secret');
+    }
+
     if (payload.type !== 'checkout.session.completed') {
       return { received: true };
     }

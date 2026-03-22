@@ -60,7 +60,7 @@ import { CartService } from '../../core/services/cart.service';
                   <div>
                     <div class="text-xs uppercase tracking-[0.24em] text-slate-400">Quantity</div>
                     <div class="mt-3 flex items-center gap-2">
-                      <button (click)="cart.updateQuantity(item.id, item.quantity - 1)" class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700">-</button>
+                      <button (click)="item.quantity === 1 ? cart.removeItem(item.id) : cart.updateQuantity(item.id, item.quantity - 1)" class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700">-</button>
                       <span class="inline-flex min-w-12 items-center justify-center rounded-full bg-slate-100 px-4 py-2 font-semibold text-slate-900">{{ item.quantity }}</span>
                       <button (click)="cart.updateQuantity(item.id, item.quantity + 1)" class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700">+</button>
                     </div>

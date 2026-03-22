@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { LicenseEntity } from '../licenses/license.entity';
 import { ProductEntity } from '../products/product.entity';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -30,7 +30,7 @@ export class OrdersService {
 
   async create(createOrderDto: CreateOrderDto, user?: RequestUser) {
     const requestedProductIds = createOrderDto.items.map((item) => item.productId);
-    const products = await this.productRepository.findByIds(requestedProductIds);
+    const products = await this.productRepository.findBy({ id: In(requestedProductIds) });
     const productMap = new Map(products.map((product) => [product.id, product]));
 
     if (products.length !== requestedProductIds.length) {
