@@ -1,47 +1,53 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO_NAME="${1:-$(basename "$(pwd)")}"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-echo "[OpenClaw] Bootstrap for $REPO_NAME..."
+copy_or_seed() {
+  local template_path="$1"
+  local target_path="$2"
+  local fallback_content="$3"
 
-# Create .env from example if it doesn't exist
-if [ ! -f .env ] && [ -f .env.example ]; then
-  cp .env.example .env
-  echo "✅ Created .env from .env.example"
-elif [ ! -f .env ]; then
-  echo "⚠️  No .env or .env.example found"
-fi
-
-# Create drafts directory for issue-sync
-if [ ! -d ".github/ISSUE_TEMPLATE/drafts" ]; then
-  mkdir -p .github/ISSUE_TEMPLATE/drafts
-  echo "✅ Created .github/ISSUE_TEMPLATE/drafts/"
-fi
-
-# Make scripts executable
-chmod +x scripts/*.sh 2>/dev/null || true
-echo "✅ Scripts made executable"
-
-# Validate required env vars
-MISSING=""
-for var in TELEGRAM_BOT_TOKEN TELEGRAM_CHAT_ID GITHUB_TOKEN GITHUB_OWNER GITHUB_REPO; do
-  if [ -z "${!var:-}" ]; then
-    MISSING="$MISSING $var"
+  if [[ -f "$target_path" ]]; then
+    printf 'skipped %s (already exists)\n' "$target_path"
+    return
   fi
-done
 
-echo ""
-echo "=== Bootstrap complete for $REPO_NAME ==="
-if [ -n "$MISSING" ]; then
-  echo "⚠️  Missing env vars:$MISSING"
-  echo "Set them in .env or your shell environment"
-else
-  echo "✅ All required env vars present"
-fi
-echo ""
-echo "Next steps:"
-echo "1. Edit .env and fill in your values" 
-echo "2. Run ./scripts/analyze.sh to test"
-echo "3. Run ./scripts/issue-sync.sh to sync draft issues"
-echo "4. Run ./scripts/report.sh to test Telegram reporting"
+  mkdir -p "$(dirname "$target_path")"
+
+  if [[ -f "$template_path" ]]; then
+    cp "$template_path" "$target_path"
+  else
+    printf '%s\n' "$fallback_content" >"$target_path"
+  fi
+
+  printf 'created %s\n' "$target_path"
+}
+
+printf '[OpenClaw] Bootstrapping TailwindVault...\n'
+
+chmod +x "$ROOT_DIR"/scripts/*.sh
+mkdir -p "$ROOT_DIR/issues/drafts" "$ROOT_DIR/issues/sent"
+
+copy_or_seed "$ROOT_DIR/.env.example" "$ROOT_DIR/.env" "OPENCLAW_REPO_NAME=tailwindvault
+OPENCLAW_REPO_PATH=.
+GITHUB_OWNER=Namoneo
+GITHUB_REPO=tailwindvault
+REPORT_ISSUE_NUMBER=
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_CHAT_ID=
+TELEGRAM_TOPIC_ID=21"
+
+copy_or_seed "$ROOT_DIR/packages/api/.env.example" "$ROOT_DIR/packages/api/.env" "DATABASE_URL=\"file:./dev.db\"
+JWT_SECRET=\"tailwindvault-dev-secret\"
+STOREFRONT_URL=\"http://localhost:4200\"
+PORT=3000"
+
+copy_or_seed "$ROOT_DIR/packages/storefront/.env.example" "$ROOT_DIR/packages/storefront/.env" "NG_APP_API_URL=\"http://localhost:3000/api\""
+
+printf '\nBootstrap complete.\n'
+printf 'Next steps:\n'
+printf '1. pnpm install\n'
+printf '2. pnpm db:push && pnpm db:seed\n'
+printf '3. pnpm --filter @tailwindvault/api start:dev\n'
+printf '4. pnpm --filter @tailwindvault/storefront start\n'

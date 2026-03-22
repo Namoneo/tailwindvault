@@ -1,0 +1,117 @@
+name: Repo Health
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 7 * * *'
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  repo-health:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPORT_ISSUE_NUMBER: ${{ vars.REPORT_ISSUE_NUMBER }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.0.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build storefront
+        id: storefront_build
+        continue-on-error: true
+        run: pnpm --filter @tailwindvault/storefront build:production
+
+      - name: Build API
+        id: api_build
+        continue-on-error: true
+        run: pnpm --filter @tailwindvault/api build
+
+      - name: Gather repo health
+        id: gather
+        if: always()
+        run: |
+          mkdir -p reports
+
+          open_pr_count="$(gh pr list --repo "${GITHUB_REPOSITORY}" --state open --json number --jq 'length' 2>/dev/null || printf '0')"
+          outdated_file="reports/outdated.txt"
+          pnpm outdated -r >"$outdated_file" 2>&1 || true
+
+          coverage_note="No automated coverage report is configured yet."
+          coverage_paths="$(find . -type d -name coverage -o -type f -name 'coverage-summary.json' | sed 's#^\./##' | head -10)"
+          if [[ -n "$coverage_paths" ]]; then
+            coverage_note="Coverage artifacts found."
+          fi
+
+          report_file="reports/repo-health.md"
+          {
+            printf '# Repo Health\n\n'
+            printf -- '- Generated: %s\n' "$(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            printf -- '- Repository: %s\n' "${GITHUB_REPOSITORY}"
+            printf -- '- Branch: %s\n\n' "${GITHUB_REF_NAME}"
+
+            printf '## Build Status\n\n'
+            printf -- '- Storefront production build: `%s`\n' "${{ steps.storefront_build.outcome }}"
+            printf -- '- API build: `%s`\n\n' "${{ steps.api_build.outcome }}"
+
+            printf '## Test Coverage\n\n'
+            printf '%s\n\n' "$coverage_note"
+            if [[ -n "$coverage_paths" ]]; then
+              printf '```text\n%s\n```\n\n' "$coverage_paths"
+            fi
+
+            printf '## Open Pull Requests\n\n'
+            printf -- '- Count: %s\n\n' "$open_pr_count"
+
+            printf '## Dependency Outdatedness\n\n'
+            if [[ -s "$outdated_file" ]]; then
+              printf '```text\n'
+              sed -n '1,120p' "$outdated_file"
+              printf '\n```\n'
+            else
+              printf 'No outdated workspace dependencies reported by `pnpm outdated -r`.\n'
+            fi
+          } >"$report_file"
+
+          cat "$report_file" >>"$GITHUB_STEP_SUMMARY"
+          printf 'report_path=%s\n' "$report_file" >>"$GITHUB_OUTPUT"
+
+      - name: Upload repo health report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: repo-health-report
+          path: ${{ steps.gather.outputs.report_path }}
+
+      - name: Comment on designated issue
+        if: always() && env.REPORT_ISSUE_NUMBER != ''
+        run: |
+          gh issue comment "${REPORT_ISSUE_NUMBER}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --body-file "${{ steps.gather.outputs.report_path }}"
+
+      - name: Fail on unhealthy build
+        if: always()
+        run: |
+          if [[ "${{ steps.storefront_build.outcome }}" != "success" || "${{ steps.api_build.outcome }}" != "success" ]]; then
+            printf 'Repository health check failed because one or more builds did not succeed.\n' >&2
+            exit 1
+          fi

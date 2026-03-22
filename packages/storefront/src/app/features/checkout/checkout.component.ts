@@ -1,7 +1,11 @@
-import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { firstValueFrom } from 'rxjs';
+import { OrderSummary } from '../../core/models/order.model';
+import { AuthService } from '../../core/services/auth.service';
+import { ApiService } from '../../core/services/api.service';
 import { CartService } from '../../core/services/cart.service';
 
 @Component({
@@ -10,7 +14,52 @@ import { CartService } from '../../core/services/cart.service';
   imports: [CommonModule, FormsModule, RouterLink],
   template: `
     <section class="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-      @if (cart.items().length === 0) {
+      @if (successOrder()) {
+        <div class="section-shell rounded-[2rem] p-10">
+          <div class="text-xs uppercase tracking-[0.24em] text-[#f26b38]">Payment complete</div>
+          <h1 class="editorial-title mt-4 text-5xl leading-none text-slate-950">Your TailwindVault order is ready.</h1>
+          <p class="mt-5 max-w-2xl text-base leading-7 text-slate-600">
+            Order #{{ successOrder()?.id }} has been marked as paid and your licenses are available from the dashboard.
+          </p>
+
+          <div class="mt-8 grid gap-4 md:grid-cols-3">
+            <div class="metric-card rounded-[1.5rem] p-5">
+              <div class="text-xs uppercase tracking-[0.24em] text-slate-500">Order total</div>
+              <div class="mt-3 text-3xl font-semibold text-slate-950">\${{ successOrder()?.total }}</div>
+            </div>
+            <div class="metric-card rounded-[1.5rem] p-5">
+              <div class="text-xs uppercase tracking-[0.24em] text-slate-500">Status</div>
+              <div class="mt-3 text-3xl font-semibold text-slate-950">{{ successOrder()?.status }}</div>
+            </div>
+            <div class="metric-card rounded-[1.5rem] p-5">
+              <div class="text-xs uppercase tracking-[0.24em] text-slate-500">Items</div>
+              <div class="mt-3 text-3xl font-semibold text-slate-950">{{ successOrder()?.items?.length ?? 0 }}</div>
+            </div>
+          </div>
+
+          <div class="mt-8 flex flex-wrap gap-3">
+            <a routerLink="/dashboard" class="brand-button rounded-full px-6 py-3 text-sm font-semibold transition">
+              Open dashboard
+            </a>
+            <a routerLink="/catalog" class="secondary-button rounded-full px-6 py-3 text-sm font-semibold transition">
+              Keep browsing
+            </a>
+            @if (!auth.isAuthenticated()) {
+              <a routerLink="/auth" class="secondary-button rounded-full px-6 py-3 text-sm font-semibold transition">
+                Sign in to view licenses
+              </a>
+            }
+          </div>
+        </div>
+      } @else if (confirming()) {
+        <div class="section-shell-dark rounded-[2rem] p-10 text-center text-white">
+          <div class="eyebrow text-xs text-[#f7c66f]">Confirming payment</div>
+          <h1 class="mt-4 text-4xl font-semibold">Finalizing your mock Stripe checkout…</h1>
+          <p class="mt-4 text-sm leading-7 text-slate-300">
+            This MVP simulates Stripe returning to the storefront, then posts a checkout completion event to the API.
+          </p>
+        </div>
+      } @else if (cart.cartItems().length === 0) {
         <div class="section-shell-dark rounded-[2rem] p-10 text-center text-white">
           <div class="eyebrow text-xs text-[#f7c66f]">Checkout</div>
           <h1 class="mt-4 text-4xl font-semibold">Your cart is empty.</h1>
@@ -33,11 +82,13 @@ import { CartService } from '../../core/services/cart.service';
             <div class="section-shell rounded-[2rem] p-7">
               <div class="text-xs uppercase tracking-[0.24em] text-slate-500">Order summary</div>
               <div class="mt-5 space-y-4">
-                @for (item of cart.items(); track item.productId) {
+                @for (item of cart.cartItems(); track item.id) {
                   <div class="flex items-start justify-between gap-4 rounded-[1.25rem] bg-[#fffdf9] p-4">
                     <div>
                       <div class="font-semibold text-slate-950">{{ item.name }}</div>
-                      <div class="mt-1 text-sm text-slate-500">{{ item.quantity }} license{{ item.quantity > 1 ? 's' : '' }}</div>
+                      <div class="mt-1 text-sm text-slate-500">
+                        {{ item.quantity }} {{ item.licenseType === 'team' ? 'studio' : 'single' }} license{{ item.quantity > 1 ? 's' : '' }}
+                      </div>
                     </div>
                     <div class="text-sm font-semibold text-slate-900">\${{ item.price * item.quantity }}</div>
                   </div>
@@ -58,84 +109,84 @@ import { CartService } from '../../core/services/cart.service';
           </aside>
 
           <div class="section-shell rounded-[2rem] p-8">
-            @if (success()) {
-              <div class="flex flex-col items-center justify-center py-12 text-center">
-                <div class="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-[#22c55e]/20">
-                  <svg class="h-10 w-10 text-[#22c55e]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-                </div>
-                <h2 class="text-3xl font-semibold text-slate-950">Order confirmed!</h2>
-                <p class="mt-4 text-slate-600">Your files are ready. Check your email for access details.</p>
-                <a routerLink="/dashboard" class="mt-8 rounded-full bg-[#102a43] px-8 py-4 text-sm font-semibold text-white transition hover:bg-[#1a3a5c]">Go to dashboard</a>
+            <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <div class="text-xs uppercase tracking-[0.24em] text-[#f26b38]">Payment</div>
+                <h2 class="mt-3 text-3xl font-semibold text-slate-950">Secure checkout</h2>
               </div>
-            } @else {
-              <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                <div>
-                  <div class="text-xs uppercase tracking-[0.24em] text-[#f26b38]">Payment</div>
-                  <h2 class="mt-3 text-3xl font-semibold text-slate-950">Secure checkout</h2>
-                </div>
-                <div class="rounded-full bg-[#f8f3e8] px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-slate-600">Test mode</div>
+              <div class="rounded-full bg-[#f8f3e8] px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-slate-600">Test mode</div>
+            </div>
+
+            <form class="mt-8 space-y-5" (ngSubmit)="processPayment()">
+              <div>
+                <label class="text-xs uppercase tracking-[0.22em] text-slate-500">Email</label>
+                <input type="email" [(ngModel)]="email" name="email" class="input-shell mt-2 w-full rounded-2xl px-4 py-4 text-slate-900 transition" />
               </div>
 
-              @if (errorMessage()) {
-                <div class="mt-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">{{ errorMessage() }}</div>
+              <div>
+                <label class="text-xs uppercase tracking-[0.22em] text-slate-500">Card number</label>
+                <input type="text" [(ngModel)]="cardNumber" name="cardNumber" placeholder="4242 4242 4242 4242" class="input-shell mt-2 w-full rounded-2xl px-4 py-4 text-slate-900 transition" />
+              </div>
+
+              <div class="grid gap-5 md:grid-cols-2">
+                <div>
+                  <label class="text-xs uppercase tracking-[0.22em] text-slate-500">Expiry</label>
+                  <input type="text" [(ngModel)]="expiry" name="expiry" placeholder="MM/YY" class="input-shell mt-2 w-full rounded-2xl px-4 py-4 text-slate-900 transition" />
+                </div>
+                <div>
+                  <label class="text-xs uppercase tracking-[0.22em] text-slate-500">CVC</label>
+                  <input type="text" [(ngModel)]="cvc" name="cvc" placeholder="123" class="input-shell mt-2 w-full rounded-2xl px-4 py-4 text-slate-900 transition" />
+                </div>
+              </div>
+
+              <div class="rounded-[1.5rem] bg-[#f8f3e8] p-5 text-sm leading-6 text-slate-700">
+                <div class="font-semibold text-slate-950">Included with every order</div>
+                <ul class="mt-3 space-y-2">
+                  @for (item of assurances; track item) {
+                    <li>{{ item }}</li>
+                  }
+                </ul>
+              </div>
+
+              @if (error()) {
+                <div class="rounded-[1.5rem] border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                  {{ error() }}
+                </div>
               }
 
-              <form class="mt-8 space-y-5" (ngSubmit)="processPayment()">
-                <div>
-                  <label class="text-xs uppercase tracking-[0.22em] text-slate-500">Email</label>
-                  <input type="email" [(ngModel)]="email" name="email" class="input-shell mt-2 w-full rounded-2xl px-4 py-4 text-slate-900 transition" />
-                </div>
+              <button type="submit" [disabled]="processing()" class="brand-button w-full rounded-full px-6 py-4 text-sm font-semibold transition disabled:opacity-50">
+                @if (processing()) {
+                  Redirecting to mock Stripe…
+                } @else {
+                  Buy now via Stripe Checkout
+                }
+              </button>
 
-                <div>
-                  <label class="text-xs uppercase tracking-[0.22em] text-slate-500">Card number</label>
-                  <input type="text" [(ngModel)]="cardNumber" name="cardNumber" placeholder="4242 4242 4242 4242" class="input-shell mt-2 w-full rounded-2xl px-4 py-4 text-slate-900 transition" />
-                </div>
-
-                <div class="grid gap-5 md:grid-cols-2">
-                  <div>
-                    <label class="text-xs uppercase tracking-[0.22em] text-slate-500">Expiry</label>
-                    <input type="text" [(ngModel)]="expiry" name="expiry" placeholder="MM/YY" class="input-shell mt-2 w-full rounded-2xl px-4 py-4 text-slate-900 transition" />
-                  </div>
-                  <div>
-                    <label class="text-xs uppercase tracking-[0.22em] text-slate-500">CVC</label>
-                    <input type="text" [(ngModel)]="cvc" name="cvc" placeholder="123" class="input-shell mt-2 w-full rounded-2xl px-4 py-4 text-slate-900 transition" />
-                  </div>
-                </div>
-
-                <div class="rounded-[1.5rem] bg-[#f8f3e8] p-5 text-sm leading-6 text-slate-700">
-                  <div class="font-semibold text-slate-950">Included with every order</div>
-                  <ul class="mt-3 space-y-2">
-                    @for (item of assurances; track item) {
-                      <li>{{ item }}</li>
-                    }
-                  </ul>
-                </div>
-
-                <button type="submit" [disabled]="processing()" class="brand-button w-full rounded-full px-6 py-4 text-sm font-semibold transition disabled:opacity-50">
-                  @if (processing()) {
-                    Processing order...
-                  } @else {
-                    Pay \${{ cart.total() }}
-                  }
-                </button>
-              </form>
-            }
+              <p class="text-xs leading-6 text-slate-500">
+                MVP note: this flow uses a mocked Stripe return URL and simulated webhook so the storefront and API can be tested end-to-end.
+              </p>
+            </form>
           </div>
         </div>
       }
     </section>
   `
 })
-export class CheckoutComponent {
-  cart = inject(CartService);
+export class CheckoutComponent implements OnInit {
+  protected readonly cart = inject(CartService);
+  protected readonly auth = inject(AuthService);
+  private readonly api = inject(ApiService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
 
   email = '';
-  cardNumber = '';
-  expiry = '';
-  cvc = '';
-  processing = signal(false);
-  success = signal(false);
-  errorMessage = signal('');
+  cardNumber = '4242 4242 4242 4242';
+  expiry = '12/34';
+  cvc = '123';
+  protected readonly processing = signal(false);
+  protected readonly confirming = signal(false);
+  protected readonly successOrder = signal<OrderSummary | null>(null);
+  protected readonly error = signal<string | null>(null);
 
   protected readonly assurances = [
     'Instant access to downloaded files after purchase',
@@ -143,35 +194,86 @@ export class CheckoutComponent {
     'Team upgrades available later without losing the original order',
   ];
 
-  processPayment(): boolean {
-    this.errorMessage.set('');
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const cardDigits = this.cardNumber.replace(/\D/g, '');
-    const expiryMatch = this.expiry.match(/^(\d{2})\/(\d{2})$/);
+  ngOnInit(): void {
+    this.email = this.auth.user()?.email ?? '';
 
-    if (!emailRegex.test(this.email)) {
-      this.errorMessage.set('Please enter a valid email address.');
-      return false;
+    const params = this.route.snapshot.queryParamMap;
+    if (params.get('success') === '1') {
+      const orderId = Number(params.get('orderId'));
+      const sessionId = params.get('session_id') ?? undefined;
+
+      if (orderId) {
+        void this.confirmPayment(orderId, sessionId);
+      }
     }
-    if (cardDigits.length < 13 || cardDigits.length > 19) {
-      this.errorMessage.set('Please enter a valid card number.');
-      return false;
-    }
-    if (!expiryMatch || parseInt(expiryMatch[1], 10) < 1 || parseInt(expiryMatch[1], 10) > 12) {
-      this.errorMessage.set('Please enter a valid expiry date (MM/YY).');
-      return false;
-    }
-    if (this.cvc.replace(/\D/g, '').length < 3 || this.cvc.replace(/\D/g, '').length > 4) {
-      this.errorMessage.set('Please enter a valid CVC.');
-      return false;
+  }
+
+  async processPayment(): Promise<void> {
+    if (!this.email.trim()) {
+      this.error.set('An email address is required for digital delivery.');
+      return;
     }
 
     this.processing.set(true);
-    setTimeout(() => {
-      this.cart.clear();
+
+    try {
+      const order = await firstValueFrom(
+        this.api.createOrder({
+          email: this.email.trim().toLowerCase(),
+          items: this.cart.cartItems().map((item) => ({
+            productId: item.productId,
+            quantity: item.quantity,
+            licenseType: item.licenseType
+          }))
+        })
+      );
+
+      if (!order.checkoutUrl) {
+        this.error.set('Unable to create a checkout session.');
+        return;
+      }
+
+      window.location.assign(order.checkoutUrl);
+    } catch {
+      this.error.set('Unable to start checkout right now. Please try again.');
+    } finally {
       this.processing.set(false);
-      this.success.set(true);
-    }, 2000);
-    return true;
+    }
+  }
+
+  private async confirmPayment(orderId: number, sessionId?: string): Promise<void> {
+    this.confirming.set(true);
+    this.error.set(null);
+
+    try {
+      const result = await firstValueFrom(
+        this.api.triggerStripeWebhook({
+          type: 'checkout.session.completed',
+          data: {
+            object: {
+              orderId,
+              sessionId
+            }
+          }
+        })
+      );
+
+      if (result.order) {
+        this.successOrder.set(result.order);
+        this.cart.clearCart();
+        await this.router.navigate([], {
+          relativeTo: this.route,
+          replaceUrl: true,
+          queryParams: {
+            complete: 1,
+            orderId: result.order.id
+          }
+        });
+      }
+    } catch {
+      this.error.set('We could not confirm the payment return.');
+    } finally {
+      this.confirming.set(false);
+    }
   }
 }

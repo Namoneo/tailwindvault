@@ -1,47 +1,92 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "[OpenClaw] Posting report to Telegram..."
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
 
-if [ -z "${TELEGRAM_BOT_TOKEN:-}" ]; then
-  echo "ERROR: TELEGRAM_BOT_TOKEN not set"
+OUTPUT_FILE=""
+SEND_TELEGRAM=true
+REPO="${GITHUB_OWNER:-Namoneo}/${GITHUB_REPO:-tailwindvault}"
+SINCE_DATE="$(date -u -v-7d '+%Y-%m-%d' 2>/dev/null || python3 - <<'PY'
+from datetime import datetime, timedelta, timezone
+print((datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d"))
+PY
+)"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --output)
+      OUTPUT_FILE="${2:-}"
+      shift 2
+      ;;
+    --no-telegram)
+      SEND_TELEGRAM=false
+      shift
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+
+if ! command -v gh >/dev/null 2>&1; then
+  printf 'gh CLI is required to build the weekly report.\n' >&2
   exit 1
 fi
 
-if [ -z "${TELEGRAM_CHAT_ID:-}" ]; then
-  echo "ERROR: TELEGRAM_CHAT_ID not set"
-  exit 1
+merged_pr_count="$(gh pr list --repo "$REPO" --state merged --search "merged:>=$SINCE_DATE" --limit 50 --json number --jq 'length' 2>/dev/null || printf '0')"
+merged_pr_lines="$(gh pr list --repo "$REPO" --state merged --search "merged:>=$SINCE_DATE" --limit 10 --json number,title,url --template '{{range .}}- PR #{{.number}} {{.title}} ({{.url}})
+{{end}}' 2>/dev/null || true)"
+opened_issue_count="$(gh issue list --repo "$REPO" --state all --search "created:>=$SINCE_DATE" --limit 100 --json number --jq 'length' 2>/dev/null || printf '0')"
+closed_issue_count="$(gh issue list --repo "$REPO" --state closed --search "closed:>=$SINCE_DATE" --limit 100 --json number --jq 'length' 2>/dev/null || printf '0')"
+run_lines="$(gh run list --repo "$REPO" --limit 5 --json workflowName,status,conclusion --template '{{range .}}- {{.workflowName}}: {{.status}}/{{.conclusion}}
+{{end}}' 2>/dev/null || true)"
+
+report_file="$(mktemp)"
+{
+  printf '# TailwindVault Weekly Report\n\n'
+  printf -- '- Generated: %s\n' "$(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+  printf -- '- Repository: %s\n' "$REPO"
+  printf -- '- Window start: %s\n\n' "$SINCE_DATE"
+
+  printf '## Summary\n\n'
+  printf -- '- PRs merged: %s\n' "$merged_pr_count"
+  printf -- '- Issues opened: %s\n' "$opened_issue_count"
+  printf -- '- Issues closed: %s\n\n' "$closed_issue_count"
+
+  printf '## Recently Merged PRs\n\n'
+  if [[ -n "$merged_pr_lines" ]]; then
+    printf '%s\n' "$merged_pr_lines"
+  else
+    printf 'No merged PRs in the last 7 days.\n'
+  fi
+  printf '\n'
+
+  printf '## Recent Workflow Runs\n\n'
+  if [[ -n "$run_lines" ]]; then
+    printf '%s\n' "$run_lines"
+  else
+    printf 'No workflow run data available.\n'
+  fi
+} >"$report_file"
+
+if [[ -n "$OUTPUT_FILE" ]]; then
+  mkdir -p "$(dirname "$OUTPUT_FILE")"
+  cp "$report_file" "$OUTPUT_FILE"
 fi
 
-TOPIC_ID="${3:-21}"
-REPO_NAME="${OPENCLAW_REPO_NAME:-tailwindvault}"
-TIMESTAMP=$(date '+%Y-%m-%d %H:%M')
+cat "$report_file"
 
-# Build the message
-if [ $# -ge 1 ]; then
-  MESSAGE="$1"
-else
-  MESSAGE="📊 Daily report for ${REPO_NAME}"
+if [[ "$SEND_TELEGRAM" == true ]] && [[ -n "${TELEGRAM_BOT_TOKEN:-}" ]] && [[ -n "${TELEGRAM_CHAT_ID:-}" ]]; then
+  # Truncate message to Telegram's 4096 character limit
+  telegram_message="$(cat "$report_file")"
+  if [[ ${#telegram_message} -gt 4096 ]]; then
+    telegram_message="${telegram_message:0:4093}..."
+  fi
+  printf '%s' "$telegram_message" | curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+    -d "chat_id=${TELEGRAM_CHAT_ID}" \
+    -d "message_thread_id=${TELEGRAM_TOPIC_ID:-21}" \
+    --data-urlencode "text@-" >/dev/null || true
 fi
 
-# Escape special characters for JSON
-ESCAPED_MESSAGE=$(echo "$MESSAGE" | sed 's/"/\\"/g' | sed 's/\n/\\n/g')
-
-# Send to topic via Telegram Bot API
-RESPONSE=$(curl -s -X POST \
-  "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-  -H "Content-Type: application/json" \
-  -d "{
-    \"chat_id\": \"${TELEGRAM_CHAT_ID}\",
-    \"message_thread_id\": \"${TOPIC_ID}\",
-    \"text\": \"🤖 *${REPO_NAME}* | ${TIMESTAMP}\n\n${ESCAPED_MESSAGE}\",
-    \"parse_mode\": \"Markdown\"
-  }")
-
-if echo "$RESPONSE" | grep -q '"ok":true'; then
-  echo "✅ Report sent successfully"
-else
-  echo "❌ Failed to send report:"
-  echo "$RESPONSE"
-  exit 1
-fi
+rm -f "$report_file"

@@ -1,0 +1,42 @@
+name: AI Daily Analysis
+
+on:
+  schedule:
+    - cron: '0 7 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPORT_ISSUE_NUMBER: ${{ vars.REPORT_ISSUE_NUMBER }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run structured analysis
+        id: analysis
+        run: |
+          mkdir -p reports
+          ./scripts/analyze.sh --output reports/ai-daily-analysis.md .
+          cat reports/ai-daily-analysis.md >>"$GITHUB_STEP_SUMMARY"
+          printf 'report_path=%s\n' "reports/ai-daily-analysis.md" >>"$GITHUB_OUTPUT"
+
+      - name: Upload daily analysis
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-daily-analysis
+          path: ${{ steps.analysis.outputs.report_path }}
+
+      - name: Comment on designated issue
+        if: env.REPORT_ISSUE_NUMBER != ''
+        run: |
+          gh issue comment "${REPORT_ISSUE_NUMBER}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --body-file "${{ steps.analysis.outputs.report_path }}"

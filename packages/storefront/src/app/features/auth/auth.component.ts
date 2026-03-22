@@ -1,7 +1,8 @@
-import { Component, signal } from '@angular/core';
+import { Component, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { RouterLink, Router } from '@angular/router';
+import { AuthService } from '../../core/services/auth.service';
 
 @Component({
   selector: 'app-auth',
@@ -23,6 +24,22 @@ import { RouterLink } from '@angular/router';
               <div class="mt-2 text-sm leading-6 text-slate-300">{{ benefit.description }}</div>
             </div>
           }
+        </div>
+
+        <div class="mt-8 rounded-[1.5rem] border border-white/10 bg-white/5 p-5">
+          <div class="text-xs uppercase tracking-[0.24em] text-[#f7c66f]">Demo accounts</div>
+          <div class="mt-4 space-y-3">
+            @for (account of demoAccounts; track account.email) {
+              <button
+                type="button"
+                (click)="useDemoAccount(account.email, account.password)"
+                class="w-full rounded-[1.25rem] border border-white/10 px-4 py-3 text-left transition hover:border-[#f7c66f]/60"
+              >
+                <div class="text-sm font-semibold text-white">{{ account.label }}</div>
+                <div class="mt-1 text-xs text-slate-300">{{ account.email }} / {{ account.password }}</div>
+              </button>
+            }
+          </div>
         </div>
 
         <div class="mt-8 flex flex-wrap gap-3 text-sm text-slate-300">
@@ -50,22 +67,46 @@ import { RouterLink } from '@angular/router';
           </button>
         </div>
 
+        @if (error()) {
+          <div class="mt-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            {{ error() }}
+          </div>
+        }
+
         <form (ngSubmit)="submit()" class="mt-8 space-y-5">
           @if (!isLogin()) {
             <div>
               <label class="text-xs uppercase tracking-[0.22em] text-slate-500">Display name</label>
-              <input type="text" [(ngModel)]="name" name="name" class="input-shell mt-2 w-full rounded-2xl px-4 py-4 text-slate-900 transition" />
+              <input
+                type="text"
+                [(ngModel)]="name"
+                name="name"
+                required
+                class="input-shell mt-2 w-full rounded-2xl px-4 py-4 text-slate-900 transition"
+              />
             </div>
           }
 
           <div>
             <label class="text-xs uppercase tracking-[0.22em] text-slate-500">Email address</label>
-            <input type="email" [(ngModel)]="email" name="email" class="input-shell mt-2 w-full rounded-2xl px-4 py-4 text-slate-900 transition" />
+            <input
+              type="email"
+              [(ngModel)]="email"
+              name="email"
+              required
+              class="input-shell mt-2 w-full rounded-2xl px-4 py-4 text-slate-900 transition"
+            />
           </div>
 
           <div>
             <label class="text-xs uppercase tracking-[0.22em] text-slate-500">Password</label>
-            <input type="password" [(ngModel)]="password" name="password" class="input-shell mt-2 w-full rounded-2xl px-4 py-4 text-slate-900 transition" />
+            <input
+              type="password"
+              [(ngModel)]="password"
+              name="password"
+              required
+              class="input-shell mt-2 w-full rounded-2xl px-4 py-4 text-slate-900 transition"
+            />
           </div>
 
           <div class="rounded-[1.5rem] bg-[#f8f3e8] p-5 text-sm leading-6 text-slate-700">
@@ -77,24 +118,46 @@ import { RouterLink } from '@angular/router';
             </ul>
           </div>
 
-          <button type="submit" class="brand-button w-full rounded-full px-6 py-4 text-sm font-semibold transition">
-            {{ isLogin() ? 'Sign In to TailwindVault' : 'Create Account' }}
+          <button
+            type="submit"
+            [disabled]="loading()"
+            class="brand-button w-full rounded-full px-6 py-4 text-sm font-semibold transition disabled:opacity-60"
+          >
+            @if (loading()) {
+              {{ isLogin() ? 'Signing in…' : 'Creating account…' }}
+            } @else {
+              {{ isLogin() ? 'Sign In to TailwindVault' : 'Create Account' }}
+            }
           </button>
         </form>
       </div>
     </section>
-  `
+  `,
 })
 export class AuthComponent {
+  private authService = inject(AuthService);
+  private router = inject(Router);
+
   isLogin = signal(true);
+  loading = signal(false);
+  error = signal<string | null>(null);
   email = '';
   password = '';
   name = '';
 
   protected readonly benefits = [
-    { title: 'License tracking', description: 'See every purchase, download, and renewal in one customer workspace.' },
-    { title: 'Framework access', description: 'Move between Angular, React, and Vue deliverables without leaving the same account.' },
-    { title: 'Faster iteration', description: 'Keep the storefront, sandbox, and admin routes connected so previews feel intentional.' },
+    {
+      title: 'License tracking',
+      description: 'See every purchase, download, and renewal in one customer workspace.',
+    },
+    {
+      title: 'Framework access',
+      description: 'Move between Angular, React, and Vue deliverables without leaving the same account.',
+    },
+    {
+      title: 'Faster iteration',
+      description: 'Keep the storefront, sandbox, and admin routes connected so previews feel intentional.',
+    },
   ];
 
   protected readonly accountStates = signal([
@@ -103,8 +166,14 @@ export class AuthComponent {
     'Faster checkout with remembered identity details',
   ]);
 
-  toggle() {
+  protected readonly demoAccounts = [
+    { label: 'Admin demo', email: 'admin@tailwindvault.dev', password: 'AdminPass123!' },
+    { label: 'Buyer demo', email: 'buyer@tailwindvault.dev', password: 'BuyerPass123!' },
+  ];
+
+  toggle(): void {
     this.isLogin.set(!this.isLogin());
+    this.error.set(null);
     this.accountStates.set(
       this.isLogin()
         ? [
@@ -120,7 +189,41 @@ export class AuthComponent {
     );
   }
 
-  submit() {
-    console.log('Auth:', { email: this.email, password: this.password, name: this.name });
+  useDemoAccount(email: string, password: string): void {
+    this.email = email;
+    this.password = password;
+    this.name = email.startsWith('admin') ? 'TailwindVault Admin' : 'TailwindVault Buyer';
+  }
+
+  async submit(): Promise<void> {
+    this.error.set(null);
+
+    if (!this.email || !this.password) {
+      this.error.set('Please fill in all required fields.');
+      return;
+    }
+
+    if (!this.isLogin() && !this.name.trim()) {
+      this.error.set('Display name is required.');
+      return;
+    }
+
+    this.loading.set(true);
+
+    try {
+      const result = this.isLogin()
+        ? await this.authService.login(this.email, this.password)
+        : await this.authService.register(this.name, this.email, this.password);
+
+      if (result.success) {
+        await this.router.navigate([this.authService.isAdmin() ? '/admin' : '/dashboard']);
+      } else {
+        this.error.set(result.error ?? 'Authentication failed. Please try again.');
+      }
+    } catch {
+      this.error.set('Something went wrong. Please try again.');
+    } finally {
+      this.loading.set(false);
+    }
   }
 }

@@ -1,0 +1,4 @@
+{
+  "build_command": "pnpm install && pnpm --filter @tailwindvault/storefront build",
+  "build_output_dir": "packages/storefront/dist/storefront/browser"
+}
